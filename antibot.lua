@@ -21,6 +21,8 @@ do
     local Connections = {}
     local RenderSteps = {}
     local NoclipConnection = nil
+    local LoopConnection = nil
+    local IsLooping = false
 
     local function DisableCollisions()
         if not Character then return end
@@ -54,11 +56,15 @@ do
             NoclipConnection:Disconnect()
             NoclipConnection = nil
         end
+        
+        if LoopConnection then
+            LoopConnection:Disconnect()
+            LoopConnection = nil
+        end
     end
 
-    local function Activate()
+    local function ActivateInternal()
         if IsEnabled then return end
-        Cleanup()
         IsEnabled = true
         LastRootCFrame = RootPart.CFrame
         
@@ -109,7 +115,7 @@ do
         end)
     end
 
-    local function Deactivate()
+    local function DeactivateInternal()
         if not IsEnabled then return end
         IsEnabled = false
         Cleanup()
@@ -122,16 +128,53 @@ do
         end
     end
 
+    -- Función principal del bucle
+    local function StartLoop()
+        if IsLooping then return end
+        IsLooping = true
+        
+        LoopConnection = RunService.Stepped:Connect(function()
+            -- No hacer nada aquí, el bucle se maneja con task.wait
+        end)
+        
+        -- Iniciar el bucle
+        task.spawn(function()
+            while IsLooping do
+                -- Encender por 1.5 segundos
+                ActivateInternal()
+                task.wait(1.2)
+                
+                -- Apagar por 3 segundos
+                DeactivateInternal()
+                task.wait(3)
+            end
+        end)
+    end
+
+    local function StopLoop()
+        if not IsLooping then return end
+        IsLooping = false
+        
+        -- Asegurar que todo se apague
+        DeactivateInternal()
+        Cleanup()
+        
+        if LoopConnection then
+            LoopConnection:Disconnect()
+            LoopConnection = nil
+        end
+    end
+
     local function Toggle()
-        if IsEnabled then
-            Deactivate()
+        if IsLooping then
+            StopLoop()
         else
-            Activate()
+            StartLoop()
         end
     end
 
     local function IsActive()
-        return IsEnabled
+        return IsLooping
     end
 
     LocalPlayer.CharacterAdded:Connect(function(newChar)
@@ -140,10 +183,11 @@ do
         RootPart = Humanoid.RootPart
         LastRootCFrame = RootPart.CFrame
         
-        if IsEnabled then
+        if IsLooping then
             task.wait(0.1)
-            IsEnabled = false
-            Activate()
+            -- Si estaba en bucle, reiniciar
+            IsLooping = false
+            StartLoop()
         end
     end)
 
@@ -252,4 +296,4 @@ UpdateButton()
 
 game:GetService("Workspace").FallenPartsDestroyHeight = 0/0
 
-print("✅ Invisibilidad + Noclip activado")
+print("✅ Invisibilidad en bucle activado (1.5s ON, 3s OFF)")
